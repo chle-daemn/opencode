@@ -18,9 +18,9 @@ bun lint               # oxlint across the repo
 bun typecheck          # turbo-orchestrated typecheck of all packages
 ```
 
-- **Requirements:** Bun matching the `packageManager` pin (currently `^1.3.14`). A `.husky/pre-push` hook enforces this Bun version and runs `bun typecheck` on every push, so a failing typecheck blocks pushing.
+- **Requirements:** Bun. The root `packageManager` field pins the exact version (`bun@1.3.14`); the `.husky/pre-push` hook derives a caret range from it (`^1.3.14`), enforces that Bun satisfies the range, and runs `bun typecheck` on every push — so a failing typecheck blocks pushing.
 - **Branch:** the default and main branch is `dev`; local `main` may not exist, so diff against `dev`/`origin/dev`.
-- **Typecheck:** always run `bun typecheck` (or `bun typecheck` from a package dir, which runs `tsgo --noEmit`). Never invoke `tsc` directly.
+- **Typecheck:** always run `bun typecheck` (or `bun typecheck` from a package dir, which runs a `tsgo` typecheck — `tsgo --noEmit` in most packages, `tsgo -b` in a few such as `app`). Never invoke `tsc` directly.
 - **Build a standalone binary:** `./packages/opencode/script/build.ts --single`.
 
 ### Tests
@@ -41,12 +41,14 @@ bun typecheck          # turbo-orchestrated typecheck of all packages
 
 ### Package dependency direction (the core invariant)
 
-Runtime dependencies must point in one direction. Violating this is the most common way to break the build/bundle boundaries:
+Runtime dependencies must point in one direction. Violating this is the most common way to break the build/bundle boundaries. Each arrow points from a package to what it depends on (`A ──> B` means A imports B):
 
 ```
-schema ─┬─> protocol ─┐
-        └─> core ─────┴─> server ──> sdk-next (+ client + core)
-client ──> schema, protocol   (NEVER core or server)
+protocol ──> schema
+core     ──> schema
+server   ──> core, protocol
+client   ──> schema, protocol          (NEVER core or server)
+sdk-next ──> client, core, server
 ```
 
 - `@opencode-ai/schema` — lightweight Effect `Schema` leaf for values that mean the same thing internally and on the wire. Depends on nothing but `effect`.
